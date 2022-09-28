@@ -1,5 +1,7 @@
 import random
 from time import localtime
+
+import requests
 from requests import get, post
 from datetime import datetime, date
 from zhdate import ZhDate
@@ -91,26 +93,6 @@ def get_weather(region):
     return weather, temp, max_temp, min_temp, wind_dir, sunrise, sunset, category, pm2p5, proposal
 
 
-def get_tianhang():
-    try:
-        key = config["tian_api"]
-        url = "http://api.tianapi.com/caihongpi/index?key={}".format(key)
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
-                          'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.36',
-            'Content-type': 'application/x-www-form-urlencoded'
-
-        }
-        response = get(url, headers=headers).json()
-        if response["code"] == 200:
-            chp = response["newslist"][0]["content"]
-        else:
-            chp = ""
-    except KeyError:
-        chp = ""
-    return chp
-
-
 def get_birthday(birthday, year, today):
     birthday_year = birthday.split("-")[0]
     # 判断是否为农历生日
@@ -148,21 +130,44 @@ def get_birthday(birthday, year, today):
     return birth_day
 
 
-def get_ciba():
-    url = "http://open.iciba.com/dsapi/"
-    headers = {
-        'Content-Type': 'application/json',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
-                      'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.36'
-    }
-    r = get(url, headers=headers)
-    note_en = r.json()["content"]
-    note_ch = r.json()["note"]
-    return note_ch, note_en
+# def get_ciba():
+#     url = "http://open.iciba.com/dsapi/"
+#     headers = {
+#         'Content-Type': 'application/json',
+#         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+#                       'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.36'
+#     }
+#     r = get(url, headers=headers)
+#     note_en = r.json()["content"]
+#     note_ch = r.json()["note"]
+#     return note_ch, note_en
+
+
+# 彩虹屁
+def post_praise():
+    try:
+        key = config["tx_key"]
+        url = "http://api.tianapi.com/caihongpi/index"
+        headers = {
+            'Content-type': 'application/x-www-form-urlencoded'
+        }
+        post_data = {
+                "key":key
+        }
+        response = post(url, headers=headers, data=post_data).json()
+        # 如果响应码不为200，公众号推送空值，防止推送报错信息
+        if response["code"] == 200:
+            praise = response["newslist"][0]["content"]
+        else:
+            praise = ""
+    except KeyError:
+        praise = ""
+    return praise
+
 
 
 def send_message(to_user, access_token, region_name, weather, temp, wind_dir, note_ch, note_en, max_temp, min_temp,
-                 sunrise, sunset, category, pm2p5, proposal, chp):
+                 sunrise, sunset, category, pm2p5, proposal, praise):
     url = "https://api.weixin.qq.com/cgi-bin/message/template/send?access_token={}".format(access_token)
     week_list = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"]
     year = localtime().tm_year
@@ -248,8 +253,8 @@ def send_message(to_user, access_token, region_name, weather, temp, wind_dir, no
                 "value": proposal,
                 "color": get_color()
             },
-            "chp": {
-                "value": chp,
+            "praise": {
+                "value": praise,
                 "color": get_color()
             },
 
@@ -305,11 +310,11 @@ if __name__ == "__main__":
     note_ch = config["note_ch"]
     note_en = config["note_en"]
     if note_ch == "" and note_en == "":
-        # 获取词霸每日金句
-        note_ch, note_en = get_ciba()
-    chp = get_tianhang()
+    # 获取词霸每日金句
+    #    note_ch, note_en = get_ciba()
+        praise = post_praise()
     # 公众号推送消息
     for user in users:
         send_message(user, accessToken, region, weather, temp, wind_dir, note_ch, note_en, max_temp, min_temp, sunrise,
-                     sunset, category, pm2p5, proposal, chp)
+                     sunset, category, pm2p5, proposal, praise)
     os.system("pause")
